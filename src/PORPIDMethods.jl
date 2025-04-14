@@ -1,5 +1,6 @@
 #export extract_tags, extract_tags_from_file, sequence_to_observation, best_of_forward_and_reverse, slice_sequence
 using BioSequences
+using CodecZlib: GzipDecompressorStream
 using PORPID
 
 const DEFAULT_MAX_ERRORS = 2
@@ -22,9 +23,17 @@ function extract_tags_from_file(file_name, config, output_function; print_every=
   r_end_i = config.reverse_end_inclusive
   try_reverse_complement = config.try_reverse_complement
   if config.filetype == fastq
-    iterator = open(FASTQ.Reader, file_name)
+    if endswith(file_name, ".gz")
+        iterator = FASTQ.Reader(GzipDecompressorStream(open(file_name)))
+    else
+        iterator = open(FASTQ.Reader, file_name)
+    end
   else
-    iterator = open(FASTA.Reader, file_name)
+    if endswith(file_name, ".gz")
+        iterator = FASTA.Reader(GzipDecompressorStream(open(file_name)))
+    else
+        iterator = open(FASTA.Reader, file_name)
+    end
   end
   i = 0
   for sequence in iterator
@@ -109,7 +118,7 @@ function choose_best_template(seq, quality, templates)
   best_tag = nothing
   best_errors = nothing
   for template in templates
-    score, tag, errors = extract_tag(seq, quality, template.reference)
+    score, tag, errors = extract_tag(LongDNA{4}(seq), quality, template.reference)
     if score >= best_score
       best_score, best_template, best_tag, best_errors = score, template, tag, errors
     end
